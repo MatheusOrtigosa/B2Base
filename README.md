@@ -11,7 +11,7 @@ Next.js, React, TypeScript e Supabase (Postgres + Auth). Hospedagem na Vercel. N
 ### 1. Preparar o Supabase
 
 1. Abra seu projeto no Supabase e entre em **SQL Editor → New query**.
-2. Em um projeto novo, execute `supabase/migrations/001_initial.sql`, depois `supabase/migrations/002_team_collaboration.sql` e `supabase/migrations/003_relationship_hub.sql`, uma única vez cada. Se o MVP inicial já está funcionando, execute **somente 002_team_collaboration.sql**. Os scripts rodam em transações e a migração 002 preserva os registros existentes.
+2. Em um projeto novo, execute `supabase/migrations/001_initial.sql`, depois `supabase/migrations/002_team_collaboration.sql`, `supabase/migrations/003_relationship_hub.sql` e `supabase/migrations/004_account_cockpit.sql`, uma única vez cada. Se o banco já está configurado, execute apenas as migrações ainda não aplicadas, em ordem. Os scripts rodam em transações e preservam os registros existentes.
 3. Em **Authentication → URL Configuration**, configure o **Site URL** com o endereço definitivo da Vercel.
 4. Adicione `https://SEU-APP.vercel.app/reset-password` e `https://SEU-APP.vercel.app` às URLs de redirecionamento. Para desenvolvimento local, adicione também `http://localhost:3000` e `http://localhost:3000/reset-password`.
 5. A autenticação inicial usa e-mail e senha. Verifique a configuração de confirmação de e-mail. Para um piloto com usuários externos, configure seu provedor SMTP conforme os limites do Supabase.
@@ -59,6 +59,54 @@ npm test
 npm run typecheck
 npm run build
 ```
+
+## Cockpit e saúde contextual (MVP 0.4)
+
+Em um banco que já recebeu a migração 003, execute **somente `004_account_cockpit.sql`** no SQL Editor. Preserva os contatos, empresas, evidências e oportunidades anteriores. O cockpit pode ser consultado antes da migração, mas o superior direto e a avaliação do vendedor só ficam editáveis após aplicá-la.
+
+### Monitor por empresa
+
+- Abra **Cockpit de contas** na sidebar e escolha a empresa.
+- Resumo: saúde do relacionamento, pipeline, contatos e próximos passos.
+- **Novo contato** e **Nova oportunidade** abrem o cadastro já com a empresa selecionada. Os cadastros gerais continuam disponíveis.
+- Contatos e organograma: defina **Superior direto** no cadastro do contato. Só são oferecidas pessoas da mesma conta, excluindo o próprio contato e seus subordinados.
+- O banco bloqueia ciclos e relações entre empresas/organizações diferentes. Para mover uma pessoa com subordinados a outra empresa, reorganize essas relações antes.
+- As linhas do organograma representam hierarquia formal cadastrada. Pessoas sem superior aparecem em ramos separados, com a lacuna explícita. Não inferimos um diretor/CEO ou apoio à venda pelo cargo.
+- Oportunidades e relacionamento: negócios e histórico da conta em visões próprias. Interações não precisam de uma oportunidade.
+- Também há acesso ao cockpit e criação de contatos/oportunidades no detalhe da empresa.
+
+### Novo score da oportunidade
+
+O score exibido em dashboard, kanban, lista, cockpit e detalhe passa a usar a mesma função de saúde contextual. O score de lead continua com a fórmula anterior.
+
+| Fator | Peso | Base |
+| --- | --- | --- |
+| Qualificação e contexto | 25% | Critérios confirmados com evidência; o checklist antigo agora é apenas um fator |
+| Percepção do vendedor | 25% | Muito desfavorável (5), desfavorável (25), neutro (50), favorável (75), muito favorável (95), sempre com justificativa |
+| Sinais nos textos | 15% | Expressões favoráveis/de atenção em discovery, evidências e justificativa da própria oportunidade |
+| Engajamento recente | 15% | Recência de conversa, conversas e tentativas sem resposta nos últimos 30 dias, com a conta |
+| Cobertura de pessoas | 10% | Quantidade de contatos e presença de decisor, apoiador e influenciador, com limites |
+| Histórico do relacionamento | 10% | Conversas realmente realizadas e período entre elas; tempo sem interação não basta |
+
+- A contribuição de cada fator é o seu peso multiplicado por sua leitura de 0 a 100. Dados desconhecidos contribuem zero e aparecem explicitamente como desconhecidos; os demais pesos não são aumentados para compensar.
+- O painel exibe quanto do peso total tem dados disponíveis. Abaixo de 50% de cobertura, usa **Pouco contexto**, mesmo que exista alguma pontuação.
+- As faixas são: **Forte** (75+), **Em construção** (50–74) e **Atenção** (abaixo de 50), quando há cobertura suficiente.
+- A percepção sem justificativa não pontua. Avaliações com mais de 60 dias têm a distância de 50 reduzida pela metade até o vendedor atualizar a avaliação/justificativa.
+- Textos curtos ou sem expressões reconhecidas permanecem desconhecidos. Repetições não multiplicam pontos; negações, hipóteses e aprovações ainda aguardadas têm tratamento básico.
+- Textos são processados localmente por regras em português. Não existe LLM, análise semântica completa ou envio a uma API de IA nesta versão; ambiguidade e ironia podem ser interpretadas incorretamente. O painel mostra os trechos reconhecidos para revisão.
+- Registros de notas e tentativas sem resposta não contam como conversa realizada para tempo de relacionamento. Conversas distantes há mais de 60 dias reduzem o fator de familiaridade pela metade.
+- Engajamento/contatos/tempo são sinais da **conta**, não evidência de apoio ao negócio específico. Essa distinção aparece no painel.
+- Ajustes adicionais: conta manualmente em risco (−10), comunicação mais recente com ponto de atenção (−5), tarefas vencidas da própria oportunidade (−2 cada, até −5). Os ajustes somados têm limite de −20 e são explicados no painel.
+- Este é um modelo inicial de priorização, não uma probabilidade calibrada de fechamento. Os pesos são hipóteses de produto que precisam ser validadas com uso real. A evolução para sentimento semântico e aprendizado com negócios ganhos/perdidos requer uma etapa própria.
+- O score é calculado ao exibir os registros; não há histórico de snapshots de score nesta etapa. A carga inicial de até 1.000 eventos recentes continua sendo o limite do histórico considerado.
+
+### Validação rápida
+
+1. Abra o cockpit de uma empresa existente.
+2. Cadastre um diretor e outro contato subordinado a ele. Confira a linha no organograma.
+3. Crie uma oportunidade pelo cockpit e confira o vínculo no funil geral.
+4. Abra a oportunidade, registre a percepção do vendedor e uma justificativa, salve e atualize a página.
+5. Compare o mesmo score no cockpit, funil e detalhe. Confira os fatores e os trechos reconhecidos.
 
 ## Empresas e contatos (MVP 0.3)
 
@@ -129,10 +177,10 @@ Use duas contas e sessões separadas (janela normal e anônima):
 - B não consegue criar/cancelar convites. Para isso é preciso ser administrador.
 - Para manter um usuário independente para novos testes de isolamento, use uma terceira conta que não foi convidada.
 
-## Scores
+## Qualificação original e score de lead
 
 - Lead: 60% aderência + 40% intenção, ambos avaliados manualmente entre 0 e 100.
-- Oportunidade: problema/impacto (25), decisor/apoio (20), adequação (20), orçamento (15), prazo/processo (10), próximo passo (10).
+- Subscore de qualificação da oportunidade (25% do novo score contextual): problema/impacto (25), decisor/apoio (20), adequação (20), orçamento (15), prazo/processo (10), próximo passo (10).
 - O critério só pontua quando confirmado e com evidência preenchida. Evidências são declarações do usuário, não validações automáticas.
 - Score não é probabilidade de fechamento.
 
@@ -149,7 +197,7 @@ Antes de usar com clientes reais, valide no seu Supabase com duas contas indepen
 - Responsáveis agora são membros reais selecionados da equipe. Nomes antigos permanecem legíveis até serem substituídos por uma atribuição a usuário.
 - Conversão automática de lead, mapa visual de influência, exclusão de registros, anexos, auditoria, IA e cobrança ficam para as próximas etapas.
 - A listagem inicial carrega os cadastros da organização e até 1.000 eventos recentes; adicione paginação antes de volumes maiores.
-- Não há personalização dos pesos do score nesta versão.
+- Não há personalização dos pesos do score nem sentimento semântico por IA nesta versão.
 - Validação no navegador e fluxo real de autenticação/banco devem ser realizados após configurar o projeto.
 
 ## Referências

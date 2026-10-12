@@ -1,8 +1,10 @@
 'use client';
+import type {OpportunityHealth} from '../lib/opportunity-health';
 import {useEffect,useId,useRef,useState,type ReactNode,type FormEvent,type InputHTMLAttributes} from 'react';
 
 export function Icon({name,size=20}:{name:string;size?:number}){
  const paths:Record<string,ReactNode>={
+ cockpit:<><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 22h8M12 18v4M7 9h3M7 13h3M15 8v6M13 11h4"/></>,
  dashboard:<><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></>,
  pipeline:<><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="14" rx="1"/></>,
  leads:<><circle cx="11" cy="11" r="7"/><circle cx="11" cy="11" r="3"/><path d="m16 16 5 5"/></>,
@@ -18,7 +20,7 @@ export function Icon({name,size=20}:{name:string;size?:number}){
  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]||paths.info}</svg>;
 }
 export function Brand(){return <div className="brand"><span className="brand-symbol">B²</span><b>B2Base<span>.</span></b></div>;}
-export function ScoreBadge({value,kind='opportunity'}:{value:number;kind?:'opportunity'|'lead'}){return <span title={kind==='lead'?'Score do lead: 60% aderência ao perfil ideal + 40% intenção de compra. Avaliação manual.':'Qualificação: critérios confirmados com evidência. Este score não é probabilidade de fechamento.'} className={`badge ${value>=75?'good':value>=50?'medium':'low'}`}><Icon name={value>=75?'check':value>=50?'clock':'warning'} size={14}/>{value}/100</span>;}
+export function ScoreBadge({value,kind='opportunity',assessment}:{value:number;kind?:'opportunity'|'lead';assessment?:OpportunityHealth}){return <span title={assessment?`${assessment.label}. ${assessment.coverage}% do peso tem dados disponíveis. Abra a oportunidade para ver os fatores.`:kind==='lead'?'Score do lead: 60% aderência ao perfil ideal + 40% intenção de compra. Avaliação manual.':'Saúde contextual: qualificação, percepção, textos e relacionamento. Abra a oportunidade para ver a composição. Não é probabilidade de fechamento.'} className={`badge ${assessment?.tone||(value>=75?'good':value>=50?'medium':'low')}`}><Icon name={value>=75?'check':value>=50?'clock':'warning'} size={14}/>{value}/100</span>;}
 export function StageBadge({stage}:{stage?:string}){const tone=stage==='Ganha'?'good':stage==='Perdida'?'low':stage==='Negociação'?'medium':stage==='Validação'||stage==='Proposta'?'info':'unknown';return <span className={`badge ${tone}`}>{stage||'Sem etapa'}</span>;}
 export function Avatar({name}:{name:string}){return <span className="avatar" aria-hidden="true">{name.slice(0,2).toUpperCase()}</span>;}
 export function Empty({text,action,onAction,icon='spark'}:{text:string;action?:string;onAction?:()=>void;icon?:string}){return <div className="empty"><span className="empty-symbol"><Icon name={icon} size={32}/></span><p>{text}</p>{action&&onAction&&<button className="secondary" onClick={onAction}><Icon name="plus"/>{action}</button>}</div>;}
@@ -30,14 +32,14 @@ export function FormField({label,helper,...props}:InputHTMLAttributes<HTMLInputE
 }
 export function FormSection({title,children}:{title:string;children:ReactNode}){return <fieldset className="form-section"><legend>{title}</legend>{children}</fieldset>;}
 export function FormFooter({busy,action,onCancel}:{busy:boolean;action:string;onCancel:()=>void}){return <footer className="form-footer"><button type="button" className="secondary" disabled={busy} onClick={onCancel}>Cancelar</button><button className="primary" type="submit" disabled={busy}>{busy?<><span className="spinner"/>Salvando…</>:action}</button></footer>;}
-export function useDialog(ref:React.RefObject<HTMLElement|null>,onClose:()=>void){
+export function useDialog(ref:React.RefObject<HTMLElement|null>,onClose:()=>void,initialFocus:'control'|'first'='control'){
  const close=useRef(onClose);close.current=onClose;
  useEffect(()=>{const previous=document.activeElement as HTMLElement|null;const element=ref.current;if(!element)return;const old=document.body.style.overflow;document.body.style.overflow='hidden';
  const focusable=()=>Array.from(element.querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),a[href],[tabindex="0"]')).filter(e=>e.getClientRects().length>0&&!e.matches(':disabled'));
- const first=element.querySelector<HTMLElement>('input:not([type="hidden"]),select,textarea')||focusable()[0];first?.focus();
+ const first=initialFocus==='first'?focusable()[0]:element.querySelector<HTMLElement>('input:not([type="hidden"]),select,textarea')||focusable()[0];first?.focus();
  function key(e:KeyboardEvent){if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close.current();}if(e.key==='Tab'){const items=focusable(),first=items[0],last=items.at(-1);if(!first){e.preventDefault();return;}if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}}
  element.addEventListener('keydown',key);return()=>{element.removeEventListener('keydown',key);document.body.style.overflow=old;previous?.focus();};
- },[ref]);
+ },[ref,initialFocus]);
 }
 export function FormModal({title,subtitle,icon,children,busy,error,action,onClose,onSubmit,drawer=false}:{title:string;subtitle:string;icon:string;children:ReactNode;busy:boolean;error:string;action:string;onClose:()=>void;onSubmit:(e:FormEvent<HTMLFormElement>)=>Promise<void>;drawer?:boolean}){
  const ref=useRef<HTMLElement>(null),dirty=useRef(false),sending=useRef(false),id=useId();const [errors,setErrors]=useState<string[]>([]);
@@ -47,6 +49,6 @@ export function FormModal({title,subtitle,icon,children,busy,error,action,onClos
  return <div className={`overlay ${drawer?'drawer-overlay':''}`}><section ref={ref} className={`dialog form-dialog ${drawer?'drawer':''}`} role="dialog" aria-modal="true" aria-labelledby={id+'-title'} aria-describedby={id+'-desc'}><div className="form-header"><span className="entity-icon"><Icon name={icon}/></span><div><h2 id={id+'-title'}>{title}</h2><p id={id+'-desc'}>{subtitle}</p></div><button className="icon-button" aria-label="Fechar" disabled={busy} onClick={close}><Icon name="close"/></button></div><form noValidate onSubmit={submit} onChange={()=>{dirty.current=true;}}><div className="form-body">{error&&<p className="alert error" role="alert"><Icon name="warning"/>{error}</p>}{errors.length>0&&<div className="alert error" role="alert"><Icon name="warning"/><div><b>Confira os campos destacados.</b><ul>{[...new Set(errors)].map(s=><li key={s}>{s}</li>)}</ul></div></div>}<fieldset className="form-controls" disabled={busy}>{children}</fieldset></div><FormFooter busy={busy} action={action} onCancel={close}/></form></section></div>;
 }
 export function DetailDialog({title,children,onClose,dirty=false,busy=false,wide=true}:{title:string;children:ReactNode;onClose:()=>void;dirty?:boolean;busy?:boolean;wide?:boolean}){
- const ref=useRef<HTMLElement>(null);function close(){if(busy)return;if(dirty&&!window.confirm('Descartar as alterações não salvas?'))return;onClose();}useDialog(ref,close);
+ const ref=useRef<HTMLElement>(null);function close(){if(busy)return;if(dirty&&!window.confirm('Descartar as alterações não salvas?'))return;onClose();}useDialog(ref,close,'first');
  return <div className="overlay"><section ref={ref} className={`dialog ${wide?'wide':''}`} role="dialog" aria-modal="true" aria-label={title} onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();}}}>{children}</section></div>;
 }

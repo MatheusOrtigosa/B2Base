@@ -136,5 +136,35 @@ test('tenant isolation, invitations and team assignment',async(t)=>{
  await assert.rejects(db.query('select * from public.relationship_events'),/permission denied/i);
  await assert.rejects(db.query('select description from public.companies'),/permission denied/i);
  });
+ await db.exec('reset role');
+ await db.exec(await readFile(new URL('../supabase/migrations/004_account_cockpit.sql',import.meta.url),'utf8'));
+ let boss,child,leaf;
+ await t.test('contacts can be created inside the account with a valid hierarchy',async()=>{
+ await as(a);
+ boss=await scalar('insert into public.contacts(organization_id,company_id,name) values($1,$2,$3) returning id',[orgA,companyA,'Diretora']);
+ child=await scalar('insert into public.contacts(organization_id,company_id,name,reports_to_id) values($1,$2,$3,$4) returning id',[orgA,companyA,'Gerente',boss]);
+ leaf=await scalar('insert into public.contacts(organization_id,company_id,name,reports_to_id) values($1,$2,$3,$4) returning id',[orgA,companyA,'Analista',child]);
+ assert.equal(await scalar('select reports_to_id from public.contacts where id=$1',[leaf]),child);
+ });
+ await t.test('self-links, cycles and supervisors from other companies are blocked',async()=>{
+ await as(a);
+ await assert.rejects(db.query('update public.contacts set reports_to_id=$1 where id=$1',[boss]),/próprio superior/);
+ await assert.rejects(db.query('update public.contacts set reports_to_id=$1 where id=$2',[leaf,boss]),/ciclo/);
+ const otherCompany=await scalar('insert into public.companies(organization_id,name) values($1,$2) returning id',[orgA,'Outra conta']);
+ const outsider=await scalar('insert into public.contacts(organization_id,company_id,name) values($1,$2,$3) returning id',[orgA,otherCompany,'Pessoa externa']);
+ await assert.rejects(db.query('update public.contacts set reports_to_id=$1 where id=$2',[outsider,child]),/mesma empresa/);
+ await assert.rejects(db.query('update public.contacts set company_id=$1 where id=$2',[otherCompany,boss]),/subordinados/);
+ });
+ await t.test('other tenants cannot attach their hierarchy to existing private contacts',async()=>{
+ await as(b);const companyB=await scalar('insert into public.companies(organization_id,name) values($1,$2) returning id',[orgB,'Cliente B']);
+ await assert.rejects(db.query('insert into public.contacts(organization_id,company_id,name,reports_to_id) values($1,$2,$3,$4)',[orgB,companyB,'Contato B',boss]),/mesma empresa/);
+ assert.equal((await db.query('update public.contacts set reports_to_id=null where id=$1 returning id',[leaf])).rows.length,0);
+ });
+ await t.test('seller feeling persists with a server timestamp and does not rewrite previous evidence',async()=>{
+ await as(a);await db.query("update public.opportunities set seller_feeling='Favorável',seller_feeling_notes='Cliente engajado com o projeto.' where id=$1",[opportunityA]);
+ const row=(await db.query('select seller_feeling,seller_feeling_updated_at,qualification from public.opportunities where id=$1',[opportunityA])).rows[0];
+ assert.equal(row.seller_feeling,'Favorável');assert.ok(row.seller_feeling_updated_at);assert.deepEqual(row.qualification,{});
+ await as(b);assert.equal((await db.query("update public.opportunities set seller_feeling='Desfavorável' where id=$1 returning id",[opportunityA])).rows.length,0);
+ });
  }finally{await db.close();}
 });

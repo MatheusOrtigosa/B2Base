@@ -1,5 +1,5 @@
 export type RelationshipRecord = {
- id:string; name?:string; company_id?:string|null; industry?:string; website?:string;
+ id:string; name?:string; company_id?:string|null;reports_to_id?:string|null; industry?:string; website?:string;
  legal_name?:string;tax_id?:string;description?:string;company_size?:string;city?:string;state?:string;country?:string;
  business_phone?:string;business_email?:string;products_services?:string;challenges?:string;strategic_objectives?:string;
  account_status?:string;icp_fit?:string;relationship_status?:string;relationship_notes?:string;

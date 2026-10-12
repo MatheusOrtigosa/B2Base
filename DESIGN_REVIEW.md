@@ -1,5 +1,7 @@
 # Revisão visual do B2Base
 
+Documento da revisão visual do MVP 0.3. O cockpit e a nova composição do score do MVP 0.4 estão descritos no README.
+
 Esta revisão preserva schema, políticas, rotas de negócio, autenticação, consultas e mutações no Supabase, além das fórmulas de qualificação e saúde. Não requer migração SQL.
 
 ## 1. Tokens e tipografia
