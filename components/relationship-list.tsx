@@ -1,0 +1,9 @@
+import {healthIndicators,overallHealth,type RelationshipRecord,type RelationshipEvent} from '../lib/relationships';
+export function HealthBadge({status,tone}:{status:string;tone:string}){return <span className={`badge ${tone}`}>{status}</span>;}
+export default function RelationshipList({kind,rows,companies,events,onOpen,onEdit}:{kind:'companies'|'contacts';rows:RelationshipRecord[];companies:RelationshipRecord[];events:RelationshipEvent[];onOpen:(id:string)=>void;onEdit:(r:RelationshipRecord)=>void}){
+ if(!rows.length)return <section className="panel"><div className="empty"><span>◎</span><p>Nenhum cadastro encontrado. Adicione um registro ou ajuste sua busca.</p></div></section>;
+ return <section className="panel relationship-list"><div className="grid-scroll"><table><thead><tr><th>{kind==='companies'?'Empresa':'Contato'}</th><th>{kind==='companies'?'Ramo / porte':'Empresa / cargo'}</th><th>Saúde</th><th>Relacionamento</th><th>Engajamento</th><th>Ações</th></tr></thead><tbody>{rows.map(r=>{
+ const h=healthIndicators(kind,r,events),overall=overallHealth(h);
+ return <tr key={r.id}><td><button className="record-link" onClick={()=>onOpen(r.id)}>{r.name}</button><small>{kind==='companies'?r.account_status||'Prospect':r.email||r.phone||'Sem canal registrado'}</small></td><td>{kind==='companies'?r.industry||'Ramo não informado':companies.find(c=>c.id===r.company_id)?.name||'Sem empresa'}<small>{kind==='companies'?r.company_size||'Porte não informado':r.job_title||'Cargo não informado'}</small></td><td><HealthBadge {...overall}/></td><td><HealthBadge {...h[0]}/></td><td><HealthBadge {...h[2]}/></td><td><div className="row-actions"><button className="secondary" onClick={()=>onOpen(r.id)}>Ver histórico</button><button className="text-button" onClick={()=>onEdit(r)}>Editar</button></div></td></tr>;
+ })}</tbody></table></div></section>;
+}

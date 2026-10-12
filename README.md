@@ -1,6 +1,6 @@
 # B2Base
 
-CRM para vendas B2B: empresas, contatos, leads, oportunidades, qualificação com evidências e próximos passos.
+CRM para vendas B2B: empresas e contatos com contexto e saúde de relacionamento, histórico de interações, leads, oportunidades, qualificação com evidências e próximos passos.
 
 ## Stack
 
@@ -11,7 +11,7 @@ Next.js, React, TypeScript e Supabase (Postgres + Auth). Hospedagem na Vercel. N
 ### 1. Preparar o Supabase
 
 1. Abra seu projeto no Supabase e entre em **SQL Editor → New query**.
-2. Em um projeto novo, execute `supabase/migrations/001_initial.sql` e depois `supabase/migrations/002_team_collaboration.sql`, uma única vez cada. Se o MVP inicial já está funcionando, execute **somente 002_team_collaboration.sql**. Os scripts rodam em transações e a migração 002 preserva os registros existentes.
+2. Em um projeto novo, execute `supabase/migrations/001_initial.sql`, depois `supabase/migrations/002_team_collaboration.sql` e `supabase/migrations/003_relationship_hub.sql`, uma única vez cada. Se o MVP inicial já está funcionando, execute **somente 002_team_collaboration.sql**. Os scripts rodam em transações e a migração 002 preserva os registros existentes.
 3. Em **Authentication → URL Configuration**, configure o **Site URL** com o endereço definitivo da Vercel.
 4. Adicione `https://SEU-APP.vercel.app/reset-password` e `https://SEU-APP.vercel.app` às URLs de redirecionamento. Para desenvolvimento local, adicione também `http://localhost:3000` e `http://localhost:3000/reset-password`.
 5. A autenticação inicial usa e-mail e senha. Verifique a configuração de confirmação de e-mail. Para um piloto com usuários externos, configure seu provedor SMTP conforme os limites do Supabase.
@@ -60,6 +60,54 @@ npm run typecheck
 npm run build
 ```
 
+## Empresas e contatos (MVP 0.3)
+
+Se o banco já está configurado, execute **somente `003_relationship_hub.sql`** no SQL Editor. Esta migração funciona com ou sem a 002 e preserva os registros existentes. A migração 001 continua sendo pré-requisito. Não execute novamente migrações já aplicadas.
+
+### Cadastros ampliados
+
+| Empresa | Contato |
+| --- | --- |
+| Nome, razão social, CNPJ/identificação fiscal | Nome, empresa, cargo, área |
+| Ramo, porte, descrição, produtos/serviços | E-mail, telefone, WhatsApp, LinkedIn |
+| Site, telefone, e-mail institucional | Canal de comunicação preferido |
+| Cidade, estado/região, país | Papel na compra e influência |
+| Tipo de conta e aderência ao cliente ideal | Prioridades, interesses e observações |
+| Desafios, objetivos estratégicos | Avaliação e contexto do relacionamento |
+| Avaliação e contexto do relacionamento | Histórico de interações e acompanhamentos |
+
+O nome é obrigatório. Os outros campos podem ser enriquecidos progressivamente; desconhecimento aparece no painel, sem bloquear o cadastro. A identificação fiscal é armazenada como texto, sem validação oficial ou consulta externa.
+
+### Saúde explicável, independente de oportunidades
+
+Clique no nome ou em **Ver histórico** na lista de Empresas/Contatos. O painel mostra:
+
+- **Relacionamento:** avaliação manual, com contexto. A comunicação mais recente com resultado “Ponto de atenção” sinaliza atenção no painel.
+- **Conhecimento do cadastro:** completo, parcial (até duas lacunas) ou a enriquecer. Cada painel explica quais informações faltam.
+- **Contato e engajamento:** conversa até 30 dias é ativa; 31–60 dias sugere retomar; acima de 60 dias é distante. Notas e tentativas sem resposta não contam como conversa. Duas tentativas sem resposta nos últimos 30 dias, sem conversa posterior, indicam “Sem retorno”.
+- **Aderência/influência:** avaliação manual da aderência da empresa ao cliente ideal ou influência do contato na compra.
+- **Próximos passos:** acompanhamentos planejados, atrasados ou sem ação pendente. Prazo é avaliado na data de São Paulo.
+
+A saúde geral não é uma probabilidade de venda. “Saudável” requer relacionamento avaliado como saudável e conversa recente; sinais de atenção geram “Atenção”, e falta de contexto gera “A conhecer”. Uma aderência baixa é um sinal de qualificação comercial e não transforma, sozinha, um relacionamento em ruim. Limiares ainda são fixos nesta versão.
+
+### Histórico de relacionamento
+
+Registre ligação, reunião, e-mail, WhatsApp, nota ou outro evento. Informe data/hora, assunto, contexto, resultado e, opcionalmente, prazo e descrição do próximo passo. Pode concluir ou reabrir o acompanhamento na própria grade.
+
+Eventos não precisam estar vinculados a uma oportunidade. São registros manuais: não fazem chamadas, enviam mensagens nem sincronizam agendas externas. A interação deve ter ocorrido; ações futuras são registradas como próximos passos.
+
+O histórico da empresa reúne seus eventos diretos e os eventos dos contatos ligados a ela no momento do registro. Essa empresa é registrada no banco na criação do evento e permanece no histórico se o contato mudar de empresa. O histórico pode ser filtrado por tipo e é ordenado pela data da interação. A interface inicial carrega até 1.000 eventos recentes por organização; paginação e cargas incrementais ficam para a evolução de volume.
+
+Interações são preservadas: apenas o estado de conclusão do acompanhamento é editável nesta etapa. Para corrigir contexto de uma interação, registre uma nova nota. Usuários de fora da organização não podem ler ou registrar eventos nela. O criador do evento é validado no banco.
+
+### Teste rápido
+
+1. Enriquecer a empresa e o contato já cadastrados.
+2. Abrir o contato e registrar uma ligação realizada, com observações e próximo passo.
+3. Conferir o evento no histórico do contato e no histórico da empresa.
+4. Atualizar a página e confirmar a persistência.
+5. Concluir o próximo passo na grade e conferir a atualização da saúde.
+
 ## Colaboração (MVP 0.2)
 
 1. Execute a migração 002 se ainda não aplicada. Sem ela, os cadastros continuam funcionando e a aba Equipe permanece indisponível.
@@ -92,7 +140,7 @@ Use duas contas e sessões separadas (janela normal e anônima):
 
 Todas as tabelas comerciais usam `organization_id` e Row Level Security. O acesso depende de membership autenticada. Referências compostas impedem relacionar um contato, oportunidade ou tarefa a um registro de outra organização. Organizações são criadas por uma função transacional que adiciona o criador como owner. O navegador não pode modificar memberships.
 
-Antes de usar com clientes reais, valide no seu Supabase com duas contas independentes: a conta B não deve ler, editar ou inserir registros da organização A, inclusive acessando a API diretamente. Testes locais executam as migrações reais em PostgreSQL embarcado (PGlite), com um esquema mínimo que simula as identidades do Supabase. Validam isolamento, convites, permissões e responsáveis. Não substituem o teste do login e dos convites no Supabase hospedado.
+Antes de usar com clientes reais, valide no seu Supabase com duas contas independentes: a conta B não deve ler, editar ou inserir registros da organização A, inclusive acessando a API diretamente. Testes locais executam as migrações reais em PostgreSQL embarcado (PGlite), com um esquema mínimo que simula as identidades do Supabase. Validam isolamento, convites, permissões, responsáveis, preservação do histórico e regras de saúde. Não substituem o teste do login e dos convites no Supabase hospedado.
 
 ## Limites desta primeira versão
 
@@ -100,7 +148,7 @@ Antes de usar com clientes reais, valide no seu Supabase com duas contas indepen
 - Membros podem editar os registros comerciais da própria empresa; não há perfis de acesso granular, remoção de membros nem transferência de administração nesta etapa.
 - Responsáveis agora são membros reais selecionados da equipe. Nomes antigos permanecem legíveis até serem substituídos por uma atribuição a usuário.
 - Conversão automática de lead, mapa visual de influência, exclusão de registros, anexos, auditoria, IA e cobrança ficam para as próximas etapas.
-- A listagem inicial carrega todos os registros da organização; adicione paginação antes de volumes maiores.
+- A listagem inicial carrega os cadastros da organização e até 1.000 eventos recentes; adicione paginação antes de volumes maiores.
 - Não há personalização dos pesos do score nesta versão.
 - Validação no navegador e fluxo real de autenticação/banco devem ser realizados após configurar o projeto.
 
