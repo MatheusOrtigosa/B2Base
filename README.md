@@ -11,7 +11,7 @@ Next.js, React, TypeScript e Supabase (Postgres + Auth). Hospedagem na Vercel. N
 ### 1. Preparar o Supabase
 
 1. Abra seu projeto no Supabase e entre em **SQL Editor → New query**.
-2. Copie o conteúdo completo de `supabase/migrations/001_initial.sql` e clique em **Run**. Execute uma única vez em um projeto novo. O script roda em uma transação.
+2. Em um projeto novo, execute `supabase/migrations/001_initial.sql` e depois `supabase/migrations/002_team_collaboration.sql`, uma única vez cada. Se o MVP inicial já está funcionando, execute **somente 002_team_collaboration.sql**. Os scripts rodam em transações e a migração 002 preserva os registros existentes.
 3. Em **Authentication → URL Configuration**, configure o **Site URL** com o endereço definitivo da Vercel.
 4. Adicione `https://SEU-APP.vercel.app/reset-password` e `https://SEU-APP.vercel.app` às URLs de redirecionamento. Para desenvolvimento local, adicione também `http://localhost:3000` e `http://localhost:3000/reset-password`.
 5. A autenticação inicial usa e-mail e senha. Verifique a configuração de confirmação de e-mail. Para um piloto com usuários externos, configure seu provedor SMTP conforme os limites do Supabase.
@@ -60,6 +60,27 @@ npm run typecheck
 npm run build
 ```
 
+## Colaboração (MVP 0.2)
+
+1. Execute a migração 002 se ainda não aplicada. Sem ela, os cadastros continuam funcionando e a aba Equipe permanece indisponível.
+2. Atualize a aplicação usando o domínio fixo do projeto na Vercel. URLs de deploy antigo continuam servindo a versão antiga. Não use o endereço com hash de uma publicação anterior para testar a nova versão.
+3. Na aba **Equipe**, o administrador informa o e-mail de um colega e cria um convite de 7 dias. O convite pode ser cancelado enquanto pendente.
+4. Copie o endereço do app e compartilhe com o colega. O B2Base não envia e-mails de convite nesta etapa.
+5. O colega cria uma conta ou entra com o e-mail convidado. Se criar, precisa confirmar o e-mail. O convite aparece no primeiro acesso; não é necessário criar outra empresa. Se já tem uma empresa, pode atualizar a aba Equipe para buscar novos convites.
+6. Após aceitar, ambos veem os mesmos registros. Pessoas com várias empresas podem alternar no seletor do espaço de trabalho.
+7. Ao criar/editar uma oportunidade ou tarefa, escolha um membro no campo Responsável. No banco, uma chave estrangeira impede atribuir usuários externos à equipe.
+
+### Validação manual antes do piloto
+
+Use duas contas e sessões separadas (janela normal e anônima):
+
+- A cria uma oportunidade privada; B cria uma empresa independente. B não deve ver os registros de A.
+- A convida o e-mail confirmado de B. Antes de aceitar, B continua sem acesso.
+- B aceita e passa a ver a empresa A no seletor, com os mesmos registros.
+- A atribui uma oportunidade e uma tarefa a B. Atualize as duas sessões e confira a persistência.
+- B não consegue criar/cancelar convites. Para isso é preciso ser administrador.
+- Para manter um usuário independente para novos testes de isolamento, use uma terceira conta que não foi convidada.
+
 ## Scores
 
 - Lead: 60% aderência + 40% intenção, ambos avaliados manualmente entre 0 e 100.
@@ -71,12 +92,13 @@ npm run build
 
 Todas as tabelas comerciais usam `organization_id` e Row Level Security. O acesso depende de membership autenticada. Referências compostas impedem relacionar um contato, oportunidade ou tarefa a um registro de outra organização. Organizações são criadas por uma função transacional que adiciona o criador como owner. O navegador não pode modificar memberships.
 
-Antes de usar com clientes reais, valide no seu Supabase com duas contas independentes: a conta B não deve ler, editar ou inserir registros da organização A, inclusive acessando a API diretamente. Testes locais validam scores e compilação; não substituem esse teste no banco.
+Antes de usar com clientes reais, valide no seu Supabase com duas contas independentes: a conta B não deve ler, editar ou inserir registros da organização A, inclusive acessando a API diretamente. Testes locais executam as migrações reais em PostgreSQL embarcado (PGlite), com um esquema mínimo que simula as identidades do Supabase. Validam isolamento, convites, permissões e responsáveis. Não substituem o teste do login e dos convites no Supabase hospedado.
 
 ## Limites desta primeira versão
 
-- Cada usuário cria seu espaço; convites e gestão da equipe ainda não têm interface. Não há cadastro público para entrar em uma organização existente.
-- Responsável é texto livre, sem atribuição a usuários.
+- Convites por e-mail são criados na aba Equipe e aceitos dentro do app com conta de e-mail confirmado; não há envio automático de e-mail. O administrador deve compartilhar o endereço do app.
+- Membros podem editar os registros comerciais da própria empresa; não há perfis de acesso granular, remoção de membros nem transferência de administração nesta etapa.
+- Responsáveis agora são membros reais selecionados da equipe. Nomes antigos permanecem legíveis até serem substituídos por uma atribuição a usuário.
 - Conversão automática de lead, mapa visual de influência, exclusão de registros, anexos, auditoria, IA e cobrança ficam para as próximas etapas.
 - A listagem inicial carrega todos os registros da organização; adicione paginação antes de volumes maiores.
 - Não há personalização dos pesos do score nesta versão.
