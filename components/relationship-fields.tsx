@@ -1,6 +1,7 @@
 import {relationshipStatuses,type RelationshipRecord} from '../lib/relationships';
+import {FormField} from './ui';
 export default function RelationshipFields({kind,row,companies}:{kind:'companies'|'contacts';row?:RelationshipRecord;companies:RelationshipRecord[]}){
- const input=(label:string,name:keyof RelationshipRecord,type='text')=><label>{label}<input name={name} type={type} defaultValue={String(row?.[name]||(name==='country'?'Brasil':''))} maxLength={name==='name'?200:500} required={name==='name'}/></label>;
+ const input=(label:string,name:keyof RelationshipRecord,type='text')=><FormField label={label} name={name} type={type} defaultValue={String(row?.[name]||(name==='country'?'Brasil':''))} maxLength={name==='name'?200:500} required={name==='name'} placeholder={name==='name'?(kind==='companies'?'Ex.: Acme Tecnologia':'Ex.: Maria Oliveira'):name==='job_title'?'Ex.: Diretora de operações':name==='industry'?'Ex.: Serviços financeiros':name==='email'||name==='business_email'?'nome@empresa.com':undefined}/>;
  const area=(label:string,name:keyof RelationshipRecord,placeholder?:string)=><label>{label}<textarea name={name} defaultValue={String(row?.[name]||(name==='country'?'Brasil':''))} placeholder={placeholder} maxLength={5000}/></label>;
  const select=(label:string,name:keyof RelationshipRecord,options:string[],fallback:string)=><label>{label}<select name={name} defaultValue={String(row?.[name]||fallback)}>{options.map(s=><option key={s}>{s}</option>)}</select></label>;
  return <>
