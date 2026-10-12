@@ -1,3 +1,4 @@
+import {plural} from './presentation.ts';
 import {score,type Qualification} from './score.ts';
 import {localDate,type RelationshipRecord,type RelationshipEvent} from './relationships.ts';
 export const feelingOptions=['Não avaliado','Muito desfavorável','Desfavorável','Neutro','Favorável','Muito favorável'];
@@ -23,7 +24,7 @@ export function textSentiment(text:string):{value:number|null;signals:TextSignal
  const positive=unique.filter(s=>s.tone==='positive').length,negative=unique.filter(s=>s.tone==='negative').length;
  if(!unique.length)return {value:null,signals:[],reason:'Nenhuma expressão conclusiva reconhecida. A leitura por regras não compreende todo o texto; não inferimos um sentimento positivo.'};
  const value=Math.round(Math.max(0,Math.min(100,50+20*positive-25*negative)));
- return {value,signals:unique,reason:`${positive} sinal(is) favorável(is) e ${negative} sinal(is) de atenção reconhecido(s) nos textos. Leitura por regras em português, sujeita a contexto e negação.`};
+ return {value,signals:unique,reason:`${plural(positive,'sinal favorável','sinais favoráveis')} e ${plural(negative,'sinal')} de atenção reconhecido(s) nos textos. Leitura por regras em português, sujeita a contexto e negação.`};
 }
 function bounded(n:number){return Math.max(0,Math.min(100,n));}
 export function opportunityHealth(o:HealthOpportunity,context:HealthContext,now:Date=new Date()):OpportunityHealth{
@@ -57,13 +58,13 @@ export function opportunityHealth(o:HealthOpportunity,context:HealthContext,now:
  add('evidence','Qualificação e contexto',25,evidenceKnown?score(o.qualification):null,'Critérios confirmados com evidência continuam úteis, mas agora representam apenas 25% da composição. Marcar sem texto não pontua.','Oportunidade');
  add('feeling','Percepção do vendedor',25,feelingValue,feelingKnown?`Avaliação: ${o.seller_feeling}. ${feelingAge!==null&&feelingAge>60?'Avaliação com mais de 60 dias: influência reduzida até ser revista.':'A justificativa registra a leitura do vendedor.'}`:'Escolha uma percepção e justifique. Uma opinião sem contexto permanece desconhecida.','Avaliação manual da oportunidade');
  add('sentiment','Sinais nos textos',15,sentiment.value,sentiment.reason,'Discovery, evidências e justificativa desta oportunidade');
- add('engagement','Engajamento recente',15,engagement,engagement===null?'Histórico indisponível ou oportunidade sem conta vinculada.':`Última conversa ${daysSince===null?'ainda não registrada':`há ${daysSince} dias`}; ${recentAnswered.length} conversa(s) e ${recent.filter(e=>e.outcome==='Sem resposta').length} tentativa(s) sem resposta nos últimos 30 dias.`,'Histórico compartilhado da conta');
- add('coverage','Cobertura de pessoas',10,coverage,coverage===null?'Vincule uma empresa para mapear as pessoas.':`${contacts.length} contato(s). ${roles.has('Decisor')?'Decisor mapeado.':'Decisor não mapeado.'} ${roles.has('Apoiador')?'Apoiador mapeado.':''} Ter muitos contatos não comprova apoio ao negócio.`,'Contatos atuais da conta');
- add('familiarity','Histórico do relacionamento',10,familiarity,familiarity===null?'Histórico indisponível ou conta não vinculada.':`${answered.length} conversa(s) distribuída(s) em ${span} dias. Tempo sozinho não pontua; relacionamento distante perde influência.`,'Conversas realizadas com a conta');
+ add('engagement','Engajamento recente',15,engagement,engagement===null?'Histórico indisponível ou oportunidade sem conta vinculada.':`Última conversa ${daysSince===null?'ainda não registrada':`há ${plural(daysSince,'dia')}`}; ${plural(recentAnswered.length,'conversa')} e ${plural(recent.filter(e=>e.outcome==='Sem resposta').length,'tentativa')} sem resposta nos últimos 30 dias.`,'Histórico compartilhado da conta');
+ add('coverage','Cobertura de pessoas',10,coverage,coverage===null?'Vincule uma empresa para mapear as pessoas.':`${plural(contacts.length,'contato')}. ${roles.has('Decisor')?'Decisor mapeado.':'Decisor não mapeado.'} ${roles.has('Apoiador')?'Apoiador mapeado.':''} Ter muitos contatos não comprova apoio ao negócio.`,'Contatos atuais da conta');
+ add('familiarity','Histórico do relacionamento',10,familiarity,familiarity===null?'Histórico indisponível ou conta não vinculada.':`${plural(answered.length,'conversa')} ao longo de ${plural(span,'dia')}. Tempo sozinho não pontua; relacionamento distante perde influência.`,'Conversas realizadas com a conta');
  const alerts:string[]=[];
  if(company?.relationship_status==='Em risco')alerts.push('A conta foi avaliada manualmente como Em risco.');
  if(communications[0]?.outcome==='Ponto de atenção')alerts.push('A comunicação mais recente da conta registra um ponto de atenção.');
- if(late.length)alerts.push(`${late.length} próximo(s) passo(s) desta oportunidade com prazo vencido.`);
+ if(late.length)alerts.push(`${plural(late.length,'próximo passo','próximos passos')} desta oportunidade com prazo vencido.`);
  const penalty=Math.min(20,(company?.relationship_status==='Em risco'?10:0)+(communications[0]?.outcome==='Ponto de atenção'?5:0)+Math.min(5,late.length*2));
  const value=Math.round(bounded(factors.reduce((sum,f)=>sum+f.contribution,0)-penalty));
  const knownWeight=factors.filter(f=>f.value!==null).reduce((sum,f)=>sum+f.weight,0);

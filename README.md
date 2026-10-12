@@ -60,6 +60,33 @@ npm run typecheck
 npm run build
 ```
 
+## Revisão de vendas (MVP 0.5 — Fase A)
+
+**Não exige nova migração.** Usa apenas as tabelas 001–004. A proposta da Fase B está em [docs/PHASE_B_PROPOSAL.md](docs/PHASE_B_PROPOSAL.md) e aguarda aprovação antes de preparar/aplicar SQL.
+
+- Filtros globais: 7/30 dias, mês/trimestre atual ou intervalo personalizado, responsável e limiar de revisão (14 dias). Parâmetros `period`, `from`, `to`, `owner`, `stale`, `view`, `stage` e `workspace` preservam a seleção na URL. `Eu` corresponde ao usuário que abrir o link; use um membro específico para compartilhar sua seleção exata.
+- O período seleciona oportunidades pela **data de criação**, em São Paulo. Mês/trimestre abrangem o início até hoje. Todos os blocos e o kanban usam essa mesma safra. As tarefas vinculadas são selecionadas pelos negócios da safra e pelo responsável da tarefa; tarefas independentes usam sua própria criação. Próximo passo de um negócio pode ser executado por outro vendedor e ainda conta como tarefa futura.
+- Pipeline aberto, saúde média com tooltip, atenção e próximos passos com comparativos da safra anterior de igual duração. Comparar saúde usa o estado atual das duas safras, não snapshots antigos de score.
+- Funil horizontal com quantidade e valor bruto, clique para abrir a etapa filtrada no kanban; previsão mensal com valor bruto, parcela vencida destacada, negócios expansíveis e tabelas acessíveis. **Nunca multiplicamos valores por score.**
+- Atenção acumula motivos e ordena por gravidade/valor. Sem próximo passo = sem tarefa pendente, vinculada à oportunidade, com prazo hoje ou depois. Tarefa vencida/sem prazo não substitui uma ação futura.
+- Plano de ação e conversas prioritárias mostram até cinco itens, com acesso à lista completa. Concentração mostra o percentual de valor aberto nos três maiores e alerta acima de 60%.
+- Modo reunião com ordem de prioridade, resumo copiável em português e impressão/salvar PDF pelo navegador. Perguntas da próxima conversa usam regras de qualificação, sem IA externa.
+
+### Precisão e limites dos dados atuais
+
+Não há `updated_at`, entrada em etapa, encerramento real ou log de etapas no schema atual. Por isso:
+
+- Não apresentamos distribuição atual entre etapas como taxa de conversão histórica.
+- A lista de negócios antigos usa criação e informa **Sem data da etapa**; não afirma que ficaram parados naquela etapa. O limiar fica configurável para a revisão e para quando datas reais existirem.
+- Ganhas/perdidas mostram o estado atual da safra criada no período; não representam negócios encerrados no período nem mudanças desde a reunião anterior. Datas de fechamento previsto nunca são tratadas como encerramento real.
+- Metas, categorias de previsão, motivos, origem/conversão vinculada e atividades por vendedor aguardam a Fase B.
+
+Para evitar totais silenciosamente truncados, a leitura das tabelas existentes é paginada e usa contagem exata, inclusive quando o limite da API é menor que 500/1.000. Mantém o cache em memória e recarrega após mutações, como o app anterior. **As agregações ainda são locais**: RPCs/views novas alteram o schema e estão incluídas na proposta, para aprovação. A Fase A ainda não atende ao requisito de agregações no banco para alto volume; é uma limitação explícita, não um recurso concluído.
+
+### Validação desta entrega
+
+Testes cobrem limites de datas/fuso, filtros e URL, igualdade entre escopo de dashboard e kanban, previsão bruta independente do score, próximos passos, motivos, pluralização, leitura com mais de 1.000 linhas e cancelamento ao trocar de workspace. Incluem os testes existentes de RLS/migrações em PostgreSQL. TypeScript e build de produção também devem passar. A conferência visual e do fluxo real de login no navegador permanece necessária no ambiente publicado.
+
 ## Cockpit e saúde contextual (MVP 0.4)
 
 Em um banco que já recebeu a migração 003, execute **somente `004_account_cockpit.sql`** no SQL Editor. Preserva os contatos, empresas, evidências e oportunidades anteriores. O cockpit pode ser consultado antes da migração, mas o superior direto e a avaliação do vendedor só ficam editáveis após aplicá-la.
@@ -98,7 +125,7 @@ O score exibido em dashboard, kanban, lista, cockpit e detalhe passa a usar a me
 - Engajamento/contatos/tempo são sinais da **conta**, não evidência de apoio ao negócio específico. Essa distinção aparece no painel.
 - Ajustes adicionais: conta manualmente em risco (−10), comunicação mais recente com ponto de atenção (−5), tarefas vencidas da própria oportunidade (−2 cada, até −5). Os ajustes somados têm limite de −20 e são explicados no painel.
 - Este é um modelo inicial de priorização, não uma probabilidade calibrada de fechamento. Os pesos são hipóteses de produto que precisam ser validadas com uso real. A evolução para sentimento semântico e aprendizado com negócios ganhos/perdidos requer uma etapa própria.
-- O score é calculado ao exibir os registros; não há histórico de snapshots de score nesta etapa. A carga inicial de até 1.000 eventos recentes continua sendo o limite do histórico considerado.
+- O score é calculado ao exibir os registros; não há histórico de snapshots de score nesta etapa. Na versão 0.5, o histórico é lido em páginas até a contagem total disponível, sem limite silencioso de 1.000 registros.
 
 ### Validação rápida
 
@@ -144,7 +171,7 @@ Registre ligação, reunião, e-mail, WhatsApp, nota ou outro evento. Informe da
 
 Eventos não precisam estar vinculados a uma oportunidade. São registros manuais: não fazem chamadas, enviam mensagens nem sincronizam agendas externas. A interação deve ter ocorrido; ações futuras são registradas como próximos passos.
 
-O histórico da empresa reúne seus eventos diretos e os eventos dos contatos ligados a ela no momento do registro. Essa empresa é registrada no banco na criação do evento e permanece no histórico se o contato mudar de empresa. O histórico pode ser filtrado por tipo e é ordenado pela data da interação. A interface inicial carrega até 1.000 eventos recentes por organização; paginação e cargas incrementais ficam para a evolução de volume.
+O histórico da empresa reúne seus eventos diretos e os eventos dos contatos ligados a ela no momento do registro. Essa empresa é registrada no banco na criação do evento e permanece no histórico se o contato mudar de empresa. O histórico pode ser filtrado por tipo e é ordenado pela data da interação. A versão 0.5 lê o histórico em páginas por organização até completar a contagem total; cargas sob demanda e agregações no banco estão propostas para a próxima fase.
 
 Interações são preservadas: apenas o estado de conclusão do acompanhamento é editável nesta etapa. Para corrigir contexto de uma interação, registre uma nova nota. Usuários de fora da organização não podem ler ou registrar eventos nela. O criador do evento é validado no banco.
 
@@ -196,7 +223,7 @@ Antes de usar com clientes reais, valide no seu Supabase com duas contas indepen
 - Membros podem editar os registros comerciais da própria empresa; não há perfis de acesso granular, remoção de membros nem transferência de administração nesta etapa.
 - Responsáveis agora são membros reais selecionados da equipe. Nomes antigos permanecem legíveis até serem substituídos por uma atribuição a usuário.
 - Conversão automática de lead, mapa visual de influência, exclusão de registros, anexos, auditoria, IA e cobrança ficam para as próximas etapas.
-- A listagem inicial carrega os cadastros da organização e até 1.000 eventos recentes; adicione paginação antes de volumes maiores.
+- As tabelas e o histórico são lidos em páginas, mas ainda reunidos no cliente. Para volume maior, aprovar e implementar as consultas agregadas/paginadas no banco da proposta da Fase B.
 - Não há personalização dos pesos do score nem sentimento semântico por IA nesta versão.
 - Validação no navegador e fluxo real de autenticação/banco devem ser realizados após configurar o projeto.
 

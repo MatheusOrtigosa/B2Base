@@ -4,6 +4,8 @@ import {DetailDialog,Icon} from './ui';
 import {HealthBadge} from './relationship-list';
 import {criteria,type Qualification} from '../lib/score';
 import {opportunityHealth,feelingOptions,type HealthContext} from '../lib/opportunity-health';
+import {conversationQuestion} from '../lib/review';
+import {localDate} from '../lib/relationships';
 import {money,fullDate} from '../lib/presentation';
 import {assigneeLabel,type TeamMember} from '../lib/team';
 import type {ViewRow} from './entity-form';
@@ -13,10 +15,12 @@ export default function OpportunityDetail({row,qualification,setQualification,co
  const feelingDirty=feeling!==(row.seller_feeling||'Não avaliado')||notes!==(row.seller_feeling_notes||'');
  const dirty=JSON.stringify(qualification)!==JSON.stringify(row.qualification||{})||feelingDirty;
  const preview={...row,qualification,seller_feeling:feeling,seller_feeling_notes:notes,seller_feeling_updated_at:feelingDirty?new Date().toISOString():row.seller_feeling_updated_at};
- const h=opportunityHealth(preview,context);const company=context.companies.find(c=>c.id===row.company_id);
+ const h=opportunityHealth(preview,context);
+ const questionReasons=[...(!context.tasks.some(t=>t.opportunity_id===row.id&&!t.done&&t.due_date&&t.due_date>=localDate())?[{key:'no-next'}]:[]),...(row.close_date&&row.close_date<localDate()?[{key:'overdue-close'}]:[])];const company=context.companies.find(c=>c.id===row.company_id);
  function leave(action:()=>void){if(busy)return;if(dirty&&!window.confirm('Descartar as alterações não salvas?'))return;action();}
  return <DetailDialog title={`Saúde contextual: ${row.name}`} onClose={onClose} dirty={dirty} busy={busy}><div className="section-heading"><div><span className="eyebrow">SAÚDE CONTEXTUAL DA OPORTUNIDADE</span><h2>{row.name}</h2><p>{company?.name||'Empresa não vinculada'} · {row.stage} · {money(Number(row.value))}</p></div><button className="icon-button" aria-label="Fechar" disabled={busy} onClick={()=>leave(onClose)}><Icon name="close"/></button></div>{error&&<p className="alert error" role="alert">{error}</p>}
  <section className="opportunity-health-hero"><div className={`health-ring ${h.tone}`} style={{'--score-angle':h.value*3.6+'deg'} as CSSProperties}><div><strong>{h.value}</strong><span>de 100</span></div></div><div><HealthBadge status={h.label} tone={h.tone}/><h3>O negócio tem contexto.<br/>O score precisa refletir isso.</h3><p>Combinamos a leitura do vendedor, sinais dos textos, qualificação e relacionamento com a conta. Esta avaliação orienta decisões; não é uma probabilidade de fechamento.</p><small>{h.coverage}% do peso tem informações disponíveis. {dirty?'Prévia com alterações ainda não salvas.':'Leitura dos dados registrados.'}</small></div></section>
+ {(h.value<50||criteria.some(c=>!qualification[c.key]?.confirmed||!qualification[c.key]?.evidence?.trim()))&&<p className="review-question"><Icon name="spark"/><span><b>Pergunta para a próxima conversa:</b> {conversationQuestion(row,questionReasons)}</span></p>}
  {!enabled&&<p className="alert">Aplique a migração 004 para salvar a percepção e a justificativa do vendedor.</p>}
  <section className="feeling-editor"><h3>Como você sente esta oportunidade?</h3><p>A sua leitura importa. Registre o que percebeu e os fatos que sustentam essa percepção.</p><label>Percepção do vendedor<select disabled={!enabled||busy} value={feeling} onChange={e=>setFeeling(e.target.value)}>{feelingOptions.map(s=><option key={s}>{s}</option>)}</select></label><label>Por que você sente isso?<textarea disabled={!enabled||busy} value={notes} maxLength={5000} onChange={e=>setNotes(e.target.value)} placeholder="Ex.: o cliente demonstra urgência, mas ainda não nos deu acesso ao decisor. Qual foi a reação na última conversa?"/></label></section>
  <h3>Por que esse score?</h3><div className="health-factor-list">{h.factors.map(f=><article className="health-factor" key={f.key}><div className="factor-heading"><b>{f.label}</b><span>{f.contribution.toFixed(1)} / {f.weight} pontos</span></div><div className="progress-track"><span style={{width:(f.value||0)+'%'}}/></div><p>{f.reason}</p><small>Fonte: {f.source} · {f.value===null?'Informação desconhecida':`Peso: ${f.weight}%`}</small></article>)}</div>
